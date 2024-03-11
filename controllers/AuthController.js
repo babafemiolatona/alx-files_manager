@@ -5,13 +5,15 @@ const sha1 = require('sha1');
 
 class AuthController {
   static async getConnect(req, res) {
-    const auth = req.headers.authorization;
-    if (!auth) {
+    const auth = req.header('Authorization').split(' ')[1];
+    const [email, password] = Buffer.from(auth, 'base64').toString('ascii').split(':');
+    if (!email || !password) {
       res.status(401).send('Unauthorized');
     }
 
-    const [email, password] = Buffer.from(auth.split(' ')[1], 'base64').toString('utf-8').split(':');
-    const user = await dbClient.db.collection('users').findOne({ email, password: sha1(password) });
+    const users = dbClient.db.collection('users');
+    const hashPassword = sha1(password);
+    const user = await users.findOne({ email, password: hashPassword });
 
     if (!user) {
       res.status(401).send('Unauthorized');
