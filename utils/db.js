@@ -9,7 +9,7 @@ class DBClient {
   constructor() {
     this.client = new MongoClient(
       URL,
-      { useUnifiedTopology: true, useNewUrlParser: true }
+      { useUnifiedTopology: true, useNewUrlParser: true },
     );
     this.client.connect();
     this.db = this.client.db(DATABASE);
