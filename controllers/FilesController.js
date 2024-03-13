@@ -1,9 +1,9 @@
 const { ObjectId } = require('mongodb');
 const { uuidv4 } = require('uuid');
 const fs = require('fs');
+const mime = require('mime-types');
 const redisClient = require('../utils/redis');
 const dbClient = require('../utils/db');
-const mime = require('mime-types');
 
 class FilesController {
   static async postUpload(req, res) {
