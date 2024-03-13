@@ -60,7 +60,7 @@ class FilesController {
         _id, userId, name, type, parentId,
       }] = res.ops;
       res.status(201).json({
-        _id, userId, name, type, parentId,
+        id: _id.toString(), userId, name, type, isPublic, parentId,
       });
     }
 
@@ -100,7 +100,7 @@ class FilesController {
     return response.status(200).json(file);
   }
 
-  static async getIndex(request, response) {
+  static async getIndex (request, response) {
     const user = await FilesController.getUser(request);
     if (!user) {
       return response.status(401).json({ error: 'Unauthorized' });
