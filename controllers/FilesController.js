@@ -85,65 +85,68 @@ class FilesController {
     }
   }
 
-  static async getShow(request, response) {
-    const user = await FilesController.getUser(request);
-    if (!user) {
-      return response.status(401).json({ error: 'Unauthorized' });
+  static async getShow(req, res) {
+    const fileId = req.params.id;
+    const token = req.headers['x-token'];
+
+    if (token === undefined) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    const fileId = request.params.id;
-    const files = dbClient.db.collection('files');
-    const idObject = new ObjectID(fileId);
-    const file = await files.findOne({ _id: idObject, userId: user._id });
-    if (!file) {
-      return response.status(404).json({ error: 'Not found' });
+    const userId = await redisClient.get(`auth_${token}`);
+    if (userId === null) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    return response.status(200).json(file);
+
+    const filesCollection = await dbClient.client.db(dbClient.database).collection('files');
+    const file = await filesCollection.findOne({ _id: ObjectID(fileId), userId: ObjectID(userId) });
+    if (file === null) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    return res.status(200).json(file);
   }
 
-  static async getIndex(request, response) {
-    const user = await FilesController.getUser(request);
-    if (!user) {
-      return response.status(401).json({ error: 'Unauthorized' });
+  static async getIndex(req, res) {
+    const token = req.headers['x-token'];
+
+    if (token === undefined) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    const {
-      parentId,
-      page,
-    } = request.query;
-    const pageNum = page || 0;
-    const files = dbClient.db.collection('files');
-    let query;
-    if (!parentId) {
-      query = { userId: user._id };
-    } else {
-      query = { userId: user._id, parentId: ObjectID(parentId) };
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (userId === null) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
-    files.aggregate(
-      [
-        { $match: query },
-        { $sort: { _id: -1 } },
-        {
-          $facet: {
-            metadata: [{ $count: 'total' }, { $addFields: { page: parseInt(pageNum, 10) } }],
-            data: [{ $skip: 20 * parseInt(pageNum, 10) }, { $limit: 20 }],
-          },
-        },
-      ],
-    ).toArray((err, result) => {
-      if (result) {
-        const final = result[0].data.map((file) => {
-          const tmpFile = {
-            ...file,
-            id: file._id,
-          };
-          delete tmpFile._id;
-          delete tmpFile.localPath;
-          return tmpFile;
-        });
-        return response.status(200).json(final);
-      }
-      return response.status(404).json({ error: 'Not found' });
-    });
-    return null;
+
+    const page = req.query.page || 0;
+    const pageSize = 20;
+    const skip = page * pageSize;
+    const query = { userId: ObjectID(userId) };
+    if (req.query.parentId !== undefined) {
+      query.parentId = ObjectID(req.query.parentId);
+    }
+
+    const pipeline = [
+      { $match: query },
+      { $skip: skip },
+      { $limit: pageSize },
+    ];
+
+    const filesCollection = dbClient.client.db(dbClient.database).collection('files');
+    const userFiles = await filesCollection.aggregate(pipeline).toArray();
+
+    const finalForm = [];
+    for (const files of userFiles) {
+      finalForm.push({
+        id: String(files._id),
+        userId: String(files.userId),
+        name: files.name,
+        type: files.type,
+        isPublic: files.isPublic,
+        parentId: (typeof files.parentId === 'object') ? String(files.parentId) : files.parentId,
+      });
+    }
+
+    return res.json(finalForm);
   }
 
   static async putPublish(request, response) {
