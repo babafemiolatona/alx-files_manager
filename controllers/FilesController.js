@@ -16,7 +16,7 @@ class FilesController {
     }
 
     const {
-      name, type, parentId = 0, isPublic = false, data,
+      name, type, parentId = '0', isPublic = false, data,
     } = req.body;
 
     if (!name) {
@@ -33,15 +33,15 @@ class FilesController {
     }
 
     const file = {
-      userId,
+      userId: ObjectID(userId),
       name,
       type,
-      parentId,
+      parentId: parentId === '0' ? '0' : ObjectID(parentId),
       isPublic,
     };
     const files = dbClient.db.collection('files');
 
-    if (parentId) {
+    if (parentId !== '0') {
       const idObject = ObjectID(parentId);
       const parent = await files.findOne({ _id: idObject });
       if (!parent) {
@@ -55,10 +55,10 @@ class FilesController {
     }
 
     if (type === 'folder') {
-      const res = await files.insertOne(file);
+      const result = await files.insertOne(file);
       const [{
         _id, userId, name, type, parentId,
-      }] = res.ops;
+      }] = result.ops;
       res.status(201).json({
         id: _id.toString, userId, name, type, parentId,
       });
