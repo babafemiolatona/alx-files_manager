@@ -156,19 +156,37 @@ class FilesController {
     if (token === undefined) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+    if (fileId === undefined) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     const userId = await redisClient.get(`auth_${token}`);
     if (userId === null) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const filesCollection = await dbClient.client.db(dbClient.database).collection('files');
-    const file = await filesCollection.findOne({ _id: ObjectID(fileId), userId: ObjectID(userId) });
-    if (file === null) {
+    const result = await filesCollection.updateOne(
+      { _id: ObjectID(fileId) },
+      { $set: { isPublic: true } },
+    );
+
+    if (result.modifiedCount !== 1) {
       return res.status(404).json({ error: 'Not found' });
     }
 
-    await filesCollection.updateOne({ _id: ObjectID(fileId) }, { $set: { isPublic: true } });
-    return res.status(200).json({ id: fileId, isPublic: true });
+    const file = await filesCollection.findOne({
+      _id: ObjectID(fileId),
+      userId: ObjectID(userId),
+    });
+    return res.status(200).json({
+      id: String(file.id),
+      userId: String(file.userId),
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: (typeof file.parentId === 'object') ? String(file.parentId) : file.parentId,
+    });
   }
 
   static async putUnpublish(req, res) {
@@ -178,19 +196,38 @@ class FilesController {
     if (token === undefined) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    if (fileId === undefined) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
     const userId = await redisClient.get(`auth_${token}`);
     if (userId === null) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const filesCollection = await dbClient.client.db(dbClient.database).collection('files');
-    const file = await filesCollection.findOne({ _id: ObjectID(fileId), userId: ObjectID(userId) });
-    if (file === null) {
+    const result = await filesCollection.updateOne(
+      { _id: ObjectID(fileId), userId: ObjectID(userId) },
+      { $set: { isPublic: false } },
+    );
+
+    if (result.modifiedCount !== 1) {
       return res.status(404).json({ error: 'Not found' });
     }
 
-    await filesCollection.updateOne({ _id: ObjectID(fileId) }, { $set: { isPublic: false } });
-    return res.status(200).json({ id: fileId, isPublic: false });
+    const file = await filesCollection.findOne({
+      _id: ObjectID(fileId),
+      userId: ObjectID(userId),
+    });
+    return res.status(200).json({
+      id: String(file.id),
+      userId: String(file.userId),
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: (typeof file.parentId === 'object') ? String(file.parentId) : file.parentId,
+    });
   }
 
   static async getFile(request, response) {
